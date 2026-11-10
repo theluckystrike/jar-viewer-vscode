@@ -1,0 +1,275 @@
+{
+  "name": "zovo-jar-viewer",
+  "displayName": "JAR Viewer & Java Decompiler (Class File Viewer, Bytecode, CFR)",
+  "description": "JAR viewer and Java decompiler for VS Code: open .jar, .war, .ear, .aar and .class files, browse packages and resources, read MANIFEST.MF, the Java version of each class, a javap-style bytecode listing and decompiled Java source (CFR, when a Java runtime is installed). Also a class file viewer. Read-only, no network.",
+  "version": "0.1.0",
+  "publisher": "zovo",
+  "license": "MIT",
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#1E2A36",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theluckystrike/jar-viewer-vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/theluckystrike/jar-viewer-vscode/issues"
+  },
+  "homepage": "https://github.com/theluckystrike/jar-viewer-vscode#readme",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Visualization",
+    "Debuggers",
+    "Other"
+  ],
+  "keywords": [
+    "jar viewer",
+    "java decompiler",
+    "class file viewer",
+    "jar decompiler",
+    "decompiler",
+    "bytecode viewer",
+    "class viewer",
+    "java class viewer",
+    "decompile java",
+    "class decompiler",
+    "javap",
+    "cfr",
+    "jar",
+    "war",
+    "ear",
+    "aar",
+    "class",
+    "bytecode",
+    "java",
+    "manifest",
+    "spring boot",
+    "reverse engineering"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "jarViewer.archive",
+        "displayName": "JAR Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.jar"
+          },
+          {
+            "filenamePattern": "*.war"
+          },
+          {
+            "filenamePattern": "*.ear"
+          },
+          {
+            "filenamePattern": "*.aar"
+          },
+          {
+            "filenamePattern": "*.class"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "jarViewer.open",
+        "title": "Open in JAR Viewer",
+        "category": "JAR Viewer",
+        "icon": "$(file-zip)"
+      },
+      {
+        "command": "jarViewer.openSample",
+        "title": "Open a sample JAR",
+        "category": "JAR Viewer"
+      },
+      {
+        "command": "jarViewer.openWalkthrough",
+        "title": "Get started",
+        "category": "JAR Viewer"
+      },
+      {
+        "command": "jarViewer.checkJava",
+        "title": "Check the Java runtime used for decompiling",
+        "category": "JAR Viewer"
+      },
+      {
+        "command": "jarViewer.exportSources",
+        "title": "Export decompiled sources of a JAR (Pro)",
+        "category": "JAR Viewer"
+      },
+      {
+        "command": "jarViewer.compare",
+        "title": "Compare two JARs (Pro)",
+        "category": "JAR Viewer"
+      },
+      {
+        "command": "jarViewer.findInFolder",
+        "title": "Find a class, method or string in every JAR of a folder (Pro)",
+        "category": "JAR Viewer"
+      },
+      {
+        "command": "jarViewer.supportDeveloper",
+        "title": "Support the developer",
+        "category": "JAR Viewer"
+      },
+      {
+        "command": "jarViewer.moreViewers",
+        "title": "More free viewers",
+        "category": "JAR Viewer"
+      },
+      {
+        "command": "jarViewer.getPro",
+        "title": "Get Zovo Pro (USD 19 once, all 22 Zovo extensions)",
+        "category": "Zovo Pro"
+      },
+      {
+        "command": "jarViewer.payWithPayPal",
+        "title": "Pay for Zovo Pro with PayPal (USD 19, team of 5 USD 59)",
+        "category": "Zovo Pro"
+      },
+      {
+        "command": "jarViewer.unlockWithSponsors",
+        "title": "I already paid: unlock with GitHub Sponsors",
+        "category": "Zovo Pro"
+      },
+      {
+        "command": "jarViewer.enterLicenseKey",
+        "title": "Enter Zovo Pro license key",
+        "category": "Zovo Pro"
+      },
+      {
+        "command": "jarViewer.removeLicense",
+        "title": "Remove Zovo Pro from this editor",
+        "category": "Zovo Pro"
+      },
+      {
+        "command": "jarViewer.payByCard",
+        "title": "Pay for Zovo Pro by card (USD 19)",
+        "category": "Zovo Pro"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "jarViewer.open",
+          "when": "resourceExtname =~ /^\\.(jar|war|ear|aar|class)$/i",
+          "group": "navigation@40"
+        },
+        {
+          "command": "jarViewer.compare",
+          "when": "resourceExtname =~ /^\\.(jar|war|ear|aar)$/i && config.jarViewer.showProTools",
+          "group": "7_modification@40"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "jarViewer.openSample",
+          "when": "true"
+        },
+        {
+          "command": "jarViewer.exportSources",
+          "when": "config.jarViewer.showProTools"
+        },
+        {
+          "command": "jarViewer.compare",
+          "when": "config.jarViewer.showProTools"
+        },
+        {
+          "command": "jarViewer.findInFolder",
+          "when": "config.jarViewer.showProTools"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "JAR Viewer",
+      "properties": {
+        "jarViewer.javaPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Java runtime used to decompile with CFR: a java binary or a JDK/JRE folder. Empty: JAVA_HOME, then java on PATH. Without Java the viewer shows bytecode only."
+        },
+        "jarViewer.showProTools": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Export sources, Compare and Find in folder buttons (Zovo Pro tools, 3 free tries each). Turn off to hide them."
+        },
+        "jarViewer.showSupportLinks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the small Rate, More free viewers and support links at the bottom of the viewer."
+        },
+        "jarViewer.askForRating": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask once, after a few days of use, whether you want to rate the extension. Never after an error."
+        }
+      }
+    },
+    "walkthroughs": [
+      {
+        "id": "jarViewer.start",
+        "title": "JAR Viewer & Java Decompiler",
+        "description": "Browse JAR files and read Java classes without leaving VS Code.",
+        "steps": [
+          {
+            "id": "open",
+            "title": "Open a JAR",
+            "description": "Click any .jar, .war, .ear or .aar file in the Explorer: it opens in the viewer with its packages, resources and MANIFEST.MF.\n[Open the sample JAR](command:jarViewer.openSample?%22jar%22)\n[Open a file...](command:jarViewer.open)",
+            "media": {
+              "markdown": "walkthrough/open.md"
+            }
+          },
+          {
+            "id": "class",
+            "title": "Bytecode and Java source",
+            "description": "Click a class to read its decompiled Java source, a javap-style bytecode listing, its fields and methods and its constant pool. Each class shows the Java version it was compiled for.\n[Open a sample class](command:jarViewer.openSample?%22class%22)",
+            "media": {
+              "markdown": "walkthrough/class.md"
+            }
+          },
+          {
+            "id": "java",
+            "title": "Turn on decompiling",
+            "description": "Decompiling runs the bundled CFR decompiler on a Java runtime (8 or newer) on your computer: JAVA_HOME, java on PATH, or the setting below. The bytecode view needs no Java.\n[Check the Java runtime](command:jarViewer.checkJava)\n[Open the setting](command:workbench.action.openSettings?%22jarViewer.javaPath%22)",
+            "media": {
+              "markdown": "walkthrough/java.md"
+            }
+          },
+          {
+            "id": "zovo-related",
+            "title": "Files that often come with Java archives",
+            "description": "If your project also has archives or binary files, these free Zovo extensions open them. A link opens the extension page, and you choose there whether to install it.\n[ZIP Explorer](command:extension.open?%5B%22zovo.zip-archive-explorer%22%5D)\n[Hex Viewer](command:extension.open?%5B%22zovo.zovo-hex-viewer%22%5D)",
+            "media": {
+              "markdown": "walkthrough/related.md"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "test": "node scripts/test.js",
+    "samples": "zsh scripts/make_samples.sh"
+  },
+  "devDependencies": {
+    "@types/vscode": "~1.90.0"
+  },
+  "sponsor": {
+    "url": "https://github.com/sponsors/theluckystrike/sponsorships?tier_id=679878"
+  }
+}

@@ -34,6 +34,9 @@ h3 { font-size: 13px; font-weight: 600; margin: 16px 0 6px; }
 .filter:focus, .goto:focus { outline: 1px solid var(--vscode-focusBorder); }
 .goto.bad { border-color: var(--vscode-inputValidation-errorBorder); }
 .thead { display: grid; flex: none; border-bottom: 1px solid var(--vscode-panel-border, #8884); padding: 0 12px; }
+.tbody { flex: 1; min-height: 0; overflow: auto; position: relative; padding: 0 12px; }
+.tbody:focus { outline: none; }
+.tbody.plain .tr { position: static; }
 .spacer { width: 1px; }
 .layer { position: absolute; top: 0; left: 12px; right: 12px; }
 .tr { display: grid; height: 22px; line-height: 22px; cursor: default; }

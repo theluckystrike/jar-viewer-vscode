@@ -34,7 +34,8 @@ const go = () => {
     }
     fs.writeFileSync(path.join(out, 'summary.txt'), 'done');
   } else {
-    const top = classes.filter((c) => !c.includes('$'));
+    const jf = args.indexOf('--jarfilter');
+    const top = classes.filter((c) => !c.includes('$') && (jf < 0 || new RegExp(args[jf + 1]).test(c.replace(/\\//g, '.'))));
     process.stdout.write('/*\\n * Decompiled with CFR 0.152.\\n */\\n' + top.map((c) => 'public class ' + c.replace(/\\//g, '.') + ' { /* inner: ' + classes.filter((x) => x.startsWith(c + '$')).length + ' */ }').join('\\n') + '\\n');
   }
 };

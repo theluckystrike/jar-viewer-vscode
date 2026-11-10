@@ -74,17 +74,41 @@ test('activation, a JAR, a class, a resource, decompiling with Java: no network,
     const input = args[args.indexOf('-jar') + 2];
     assert.ok(input.startsWith(path.join(s.context.globalStorageUri.fsPath, 'tmp') + path.sep), input);
     assert.match(path.basename(input), /^in-[0-9a-f]{12}\.jar$/);
-    assert.deepStrictEqual(tmpLeft(s), [], 'temp input removed');
+    assert.deepStrictEqual(args.slice(args.indexOf('-jar') + 3), ['--jarfilter', '^com\\.zovo\\.demo\\.Hello$', '--silent', 'true']);
+    assert.strictEqual(tmpLeft(s).length, 1, 'one staged JAR while the editor is open');
     // cached: the outer class does not run CFR again
     await v.send({ type: 'class', path: 'com/zovo/demo/Hello.class' });
     assert.strictEqual(fs.readFileSync(LOG, 'utf8').trim().split('\n').length, 1);
     await v.send({ type: 'resource', path: 'config/app.properties' });
     assert.strictEqual(last(v, 'resource').res.text, 'greeting=hello\nmode=test\n');
+    // another class reuses the staged JAR
+    await v.send({ type: 'decompile', path: 'com/zovo/demo/util/Strings.class' });
+    assert.match(last(v, 'source').text, /public class com\.zovo\.demo\.util\.Strings/);
+    assert.ok(!/Hello/.test(last(v, 'source').text));
+    assert.strictEqual(tmpLeft(s).length, 1);
+    v.panel.dispose();
+    assert.deepStrictEqual(tmpLeft(s), [], 'staged JAR removed when the editor closes');
     await v.send({ type: 'rendered' });
     assert.deepStrictEqual(nw.calls, []);
     assert.deepStrictEqual([s.log.info.length, s.log.warn.length, s.log.error.length], [0, 0, 0], 'no message on open');
     assert.deepStrictEqual(s.log.external, []);
   } finally { nw.restore(); s.restore(); }
+});
+
+test('quick clicks run one CFR at a time; the newest class wins', async () => {
+  const s = boot(makeFakeJava(dir, { sleepMs: 300 }));
+  try {
+    fs.writeFileSync(LOG, '');
+    const v = await openInViewer(s, JAR2);
+    const p1 = v.send({ type: 'decompile', path: 'com/zovo/demo/Hello.class' });
+    const p2 = v.send({ type: 'decompile', path: 'com/zovo/demo/New.class' });
+    const p3 = v.send({ type: 'decompile', path: 'com/zovo/demo/util/Strings.class' });
+    await Promise.all([p1, p2, p3]);
+    await new Promise((r) => setTimeout(r, 1500));
+    const runs = fs.readFileSync(LOG, 'utf8').trim().split('\n').length;
+    assert.strictEqual(runs, 2, 'the middle request was replaced by the newest');
+    assert.deepStrictEqual(v.posted.filter((m) => m.type === 'source').map((m) => m.path), ['com/zovo/demo/Hello.class', 'com/zovo/demo/util/Strings.class']);
+  } finally { s.restore(); }
 });
 
 test('a .class file opens on its own and is decompiled with its inner class from the same folder', async () => {
@@ -325,6 +349,8 @@ test('real CFR on a real Java (runs when JAR_VIEWER_TEST_JAVA is set)', { skip: 
     assert.match(src.text, /public class Hello\s+implements Comparable<Hello>/);
     assert.match(src.text, /public static final String GREETING = "Hello, JAR";/);
     assert.match(src.text, /case 1:/);
+    assert.ok(!/Could not load/.test(src.text), 'the other classes of the JAR resolve');
+    v.panel.dispose();
     assert.deepStrictEqual(tmpLeft(s), []);
   } finally { s.restore(); }
 });

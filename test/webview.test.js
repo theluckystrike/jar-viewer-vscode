@@ -116,3 +116,17 @@ test('webview: showProTools false hides the Pro buttons; compare and find views'
   doc.querySelector('.findrow').click();
   assert.deepStrictEqual(sent.at(-1), { type: 'openFile', path: '/w/a.jar', select: 'a/B.class' });
 });
+
+test('css: every virtual list scrolls in its own box (the absolute row layer needs a positioned, scrolling .tbody)', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'media', 'main.css'), 'utf8');
+  const rule = (sel) => { const m = new RegExp(`(^|\\n)${sel.replace(/\./g, '\\.')}\\s*\\{([^}]*)\\}`).exec(css); return m ? m[2] : ''; };
+  const tb = rule('.tbody');
+  assert.match(tb, /position:\s*relative/);
+  assert.match(tb, /overflow:\s*auto/);
+  assert.match(tb, /min-height:\s*0/);
+  assert.match(tb, /flex:\s*1/);
+  assert.match(rule('.layer'), /position:\s*absolute/);
+  // every element that holds a .layer is a .tbody
+  const js = fs.readFileSync(path.join(__dirname, '..', 'media', 'main.js'), 'utf8');
+  assert.ok((js.match(/class: 'tbody[ '][^']*'/g) || []).length >= 2);
+});

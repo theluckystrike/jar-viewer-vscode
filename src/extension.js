@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const { runJob, findInFiles } = require('./runner');
 const tools = require('./core/tools');
 const { joinInside } = require('./core/limits');
+const { classNameOf: J_className } = require('./core/jar');
 const { findJava, runCfr } = require('./java');
 const { buildHtml } = require('./html');
 const { createPro } = require('./pro');
@@ -60,39 +61,58 @@ async function sourceOf(uri) {
 }
 const jobSrc = (s) => (s.file ? { file: s.file } : { buffer: s.buffer.slice(0) });
 
-/** Decompiles one class (with its inner classes) of a JAR or a .class file. Resolves { text } or { error }. */
+/**
+ * Decompiles one class (with its inner classes) of a JAR or a .class file. Resolves { text } or { error }.
+ * A JAR is staged once per viewer (every checked class, in the extension's storage) and CFR decompiles only the
+ * wanted outer class from it (--jarfilter), so it can resolve the other classes of the JAR. The staged file is
+ * removed when the editor closes.
+ */
 async function decompile(v, entryPath) {
   const j = await java();
   if (!j.ok) return { error: 'nojava' };
-  const key = `${v.nested || ''}|${entryPath.replace(/\.class$/, '').replace(/\$.*$/, '')}`;
+  const outerPath = entryPath.replace(/\.class$/, '').replace(/\$.*$/, '');
+  const key = `${v.nested || ''}|${outerPath}`;
   if (v.sources.has(key)) return v.sources.get(key);
-  const dir = tempDir();
+  let input, extra = [], once = null;
+  if (v.model.kind === 'classfile') {
+    once = tempDir();
+    input = path.join(once, `in-${crypto.randomBytes(6).toString('hex')}.jar`);
+    let siblings = [];
+    if (v.uri.scheme === 'file') {
+      const d = path.dirname(v.uri.fsPath), base = path.basename(v.uri.fsPath).replace(/\.class$/i, '').replace(/\$.*$/, '');
+      try { siblings = fs.readdirSync(d).filter((f) => f.startsWith(`${base}$`) && f.endsWith('.class')).slice(0, 500).map((f) => path.join(d, f)); } catch { siblings = []; }
+    }
+    const staged = await runJob({ op: 'stage', ...jobSrc(v.src), classFile: true, siblings, out: input });
+    if (!staged.written) { rmrf(once); return { error: 'This class has a name that cannot be decompiled safely.' }; }
+  } else {
+    const sk = v.nested || '';
+    if (!v.staged.has(sk)) {
+      if (!v.tmp) v.tmp = tempDir();
+      const out = path.join(v.tmp, `in-${crypto.randomBytes(6).toString('hex')}.jar`);
+      v.staged.set(sk, runJob({ op: 'stage', ...jobSrc(v.src), nested: v.nested || undefined, out }, { idleMs: 60000 }).then((r) => ({ out, names: new Set(r.names), all: r.names.length >= 50000 })));
+    }
+    let st;
+    try { st = await v.staged.get(sk); } catch (e) { v.staged.delete(sk); throw e; }
+    const want = J_className(entryPath.replace(/\$.*$/, '').replace(/(\.class)?$/, '.class'));
+    if (!st.all && !st.names.has(`${want.replace(/\./g, '/')}.class`)) return { error: 'This class has a name that cannot be decompiled safely (it does not match its path, or it has characters a file name cannot hold).' };
+    input = st.out;
+    extra = ['--jarfilter', `^${want.replace(/[^A-Za-z0-9_]/g, (c) => `\\${c}`)}$`];
+  }
   try {
-    const input = path.join(dir, `in-${crypto.randomBytes(6).toString('hex')}.jar`);
-    let staged;
-    if (v.model.kind === 'classfile') {
-      let siblings = [];
-      if (v.uri.scheme === 'file') {
-        const d = path.dirname(v.uri.fsPath), base = path.basename(v.uri.fsPath).replace(/\.class$/i, '').replace(/\$.*$/, '');
-        try { siblings = fs.readdirSync(d).filter((f) => f.startsWith(`${base}$`) && f.endsWith('.class')).slice(0, 500).map((f) => path.join(d, f)); } catch { siblings = []; }
-      }
-      staged = await runJob({ op: 'stage', ...jobSrc(v.src), classFile: true, siblings, out: input });
-    } else staged = await runJob({ op: 'stage', ...jobSrc(v.src), nested: v.nested || undefined, groupOf: entryPath, out: input });
-    if (!staged.written) return { error: 'This class has a name that cannot be decompiled safely (it does not match its path, or it has characters a file name cannot hold).' };
-    const r = await runCfr(j.path, input, ['--silent', 'true'], { timeoutMs: 45000 });
+    const r = await runCfr(j.path, input, [...extra, '--silent', 'true'], { timeoutMs: 45000 });
     let res;
     if (r.timedOut) res = { error: 'CFR did not finish in 45 seconds and was stopped. The Bytecode tab shows this class.' };
     else if (r.code !== 0 || !r.stdout.trim()) res = { error: `CFR could not decompile this class${r.stderr ? `: ${r.stderr.split('\n').filter(Boolean).slice(-3).join(' ').slice(0, 400)}` : '.'}` };
     else res = { text: r.stdout.replace(/\r\n/g, '\n') };
     if (res.text) { v.sources.set(key, res); if (v.sources.size > 200) v.sources.delete(v.sources.keys().next().value); }
     return res;
-  } finally { rmrf(dir); }
+  } finally { if (once) rmrf(once); }
 }
 
 class Viewer {
   constructor(uri, panel) {
     this.uri = uri; this.panel = panel; this.model = null; this.outer = null; this.name = baseName(uri); this.counted = false;
-    this.nested = ''; this.sources = new Map(); this.src = null;
+    this.nested = ''; this.sources = new Map(); this.src = null; this.staged = new Map(); this.tmp = null;
   }
   post(msg) { return this.panel.webview.postMessage(msg).then(undefined, () => false); }
   async load() {
@@ -158,11 +178,21 @@ class Viewer {
       default: return undefined;
     }
   }
+  /** One CFR run at a time per viewer: a click during a run replaces the waiting request (no pile of JVMs). */
   async sendSource(p) {
+    this.wantSource = p;
+    if (this.decompiling) return undefined;
+    this.decompiling = true;
     try {
-      const r = await decompile(this, p);
-      return this.post({ type: 'source', path: p, ...r });
-    } catch (e) { return this.post({ type: 'source', path: p, error: e.message }); }
+      while (this.wantSource !== null && this.wantSource !== undefined) {
+        const cur = this.wantSource;
+        this.wantSource = null;
+        let r;
+        try { r = await decompile(this, cur); } catch (e) { r = { error: e.message }; }
+        await this.post({ type: 'source', path: cur, ...r });
+      }
+    } finally { this.decompiling = false; }
+    return undefined;
   }
 }
 
@@ -186,7 +216,7 @@ class Provider {
     viewers.add(v);
     if (panel.active) active = v;
     panel.onDidChangeViewState(() => { if (panel.active) active = v; else if (active === v && !panel.visible) active = null; });
-    panel.onDidDispose(() => { viewers.delete(v); if (active === v) active = null; });
+    panel.onDidDispose(() => { viewers.delete(v); if (active === v) active = null; if (v.tmp) rmrf(v.tmp); v.tmp = null; v.staged.clear(); });
     panel.webview.onDidReceiveMessage((m) => v.onMessage(m).then(undefined, (e) => v.post({ type: 'notice', text: String(e && e.message || e) })));
   }
 }
@@ -261,7 +291,7 @@ async function exportSources(from) {
       const input = path.join(dir, `in-${crypto.randomBytes(6).toString('hex')}.jar`);
       const staged = await runJob({ op: 'stage', ...jobSrc(j.src), nested: j.nested || undefined, out: input }, { idleMs: 60000, onProgress: (p) => { progress.report({ message: `Reading classes: ${p.staged} of ${p.total}` }); return token.isCancellationRequested ? 'stop' : undefined; } });
       if (staged.stopped || token.isCancellationRequested) { result.stopped = true; return; }
-      const total = staged.written;
+      const total = staged.names.filter((n) => !n.includes('$')).length || staged.written; // CFR reports top-level classes
       let done = 0;
       const out = path.join(dir, 'out');
       const r = await runCfr(jv.path, input, ['--outputdir', out, '--silent', 'false'], {
@@ -393,6 +423,11 @@ function refreshPro() { for (const v of viewers) v.post({ type: 'pro', pro: proS
 
 function activate(context) {
   ctx = context;
+  // Staged JARs left by a crashed window (older than a day) are removed; open editors remove their own on close.
+  try {
+    const base = path.join(context.globalStorageUri.fsPath, 'tmp');
+    for (const d of fs.readdirSync(base)) { const p = path.join(base, d); if (/^cfr-/.test(d) && Date.now() - fs.statSync(p).mtimeMs > 86400000) rmrf(p); }
+  } catch { /* no tmp folder yet */ }
   rating = createRatingPrompt({ vscode, context, extensionId: EXT_ID, section: PREFIX, name: 'JAR Viewer' });
   registerSupport({ vscode, context, prefix: PREFIX, selfId: EXT_ID });
   pro = createPro({ vscode, context });
@@ -435,6 +470,6 @@ function activate(context) {
   }));
 }
 
-function deactivate() {}
+function deactivate() { for (const v of viewers) if (v.tmp) rmrf(v.tmp); }
 
 module.exports = { activate, deactivate, listJars, copyTree, decompile, JAR_EXT };

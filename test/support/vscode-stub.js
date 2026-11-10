@@ -103,7 +103,7 @@ async function openInViewer(stub, file, vt = 'jarViewer.archive') {
   const panel = {
     active: true, visible: true,
     webview: { options: {}, html: '', cspSource: 'vscode-resource:', asWebviewUri: (u) => u, postMessage: async (m) => { posted.push(m); stub.log.posted.push(m); return true; }, onDidReceiveMessage: (f) => { onMsg = f; return { dispose() {} }; } },
-    onDidChangeViewState: () => ({ dispose() {} }), onDidDispose: () => ({ dispose() {} }), reveal() {},
+    onDidChangeViewState: () => ({ dispose() {} }), onDidDispose: (f) => { panel.dispose = f; return { dispose() {} }; }, reveal() {},
   };
   const p = stub.providers.get(vt);
   const doc = await p.openCustomDocument(stub.vscode.Uri.file(file));

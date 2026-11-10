@@ -34,7 +34,7 @@ CFR is a Java program, so decompiled source needs a Java runtime, version 8 or n
 
 Without Java, every other view works and the Java source tab shows one line on how to turn decompiling on. Nothing pops up. The command JAR Viewer: Check the Java runtime used for decompiling shows which Java is used.
 
-CFR runs in its own process with a 45-second limit and a 512 MB memory cap. The class goes to CFR as a temporary file in the extension's storage folder, which is deleted right after.
+CFR runs in its own process with a 45-second limit and a 512 MB memory cap. CFR gets the classes of the open JAR as one temporary file in the extension's storage folder, so the other classes of the JAR resolve; the file is deleted when you close the editor. Only one CFR process runs per editor at a time.
 
 ## Free and Pro
 

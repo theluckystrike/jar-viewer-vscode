@@ -4,6 +4,13 @@ Open a `.jar`, `.war`, `.ear`, `.aar` or `.class` file in VS Code and see what i
 
 ![JAR viewer: the packages of a JAR on the left, the decompiled Java source of a class on the right](images/jar-source.png)
 
+## Teams and companies
+
+- Zovo Pro Team is the company licence: USD 59 once for a team of 5, one key, the Pro tools in every Zovo extension that has them. [See Zovo Pro Team](https://license.zovo.one/buy/zovo-pro-team?client_reference_id=readme-jar)
+- Commercial use is allowed.
+- The key is checked on your computer, so it works offline. No account and no subscription.
+- Invoice with your company name and tax ID on request: support@zovo.one.
+
 ## What you see
 
 - Packages and resources: the archive as a tree of packages, with a filter that finds a class or file among 50,000 entries as you type. Inner classes are dimmed under their outer class.
